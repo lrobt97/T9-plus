@@ -10,13 +10,16 @@ var description = "An expansion to the 'Convergence Test' theory which contains 
 var authors = "Gaunter#7599 - Framework design";
 var version = "1.0";
 
+// Decouples main theory currency from tau gain
+var rho = BigNumber.ONE;
+
 var q = BigNumber.ONE;
 var q1, q2;
 var activeChallenge = 0;
 var challengeCompletionUpgrade;
 var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton;
 class Challenge {
-    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore) {
+    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore, tickFunction) {
         this.id = id;
         this.score = score;
         this.isUnlocked = isUnlocked;
@@ -27,6 +30,7 @@ class Challenge {
         this.secondaryEquation = secondaryEquation;
         this.tertiaryEquation = tertiaryEquation;
         this.calculateScore = calculateScore;
+        this.tick = eval(tickFunction);
     }
 
     getScore() {
@@ -41,6 +45,10 @@ class Challenge {
         return this.primaryEquation;
     }
 
+    getSecondaryEquation() {
+        return this.secondaryEquation;
+    }
+
     getCompletionRequirement() {
         return this.completionRequirement;
     }
@@ -50,15 +58,36 @@ class Challenge {
         this.challengeCurrency = BigNumber.ONE;
         activeChallenge = 0;
         theory.invalidatePrimaryEquation();
+        theory.invalidateSecondaryEquation();
     }
 }
 
 var challengeList = [
-    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "", "", () => {return BigNumber.from(1e10)}),
-    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}", "", "", () => {return BigNumber.from(1e10)}),
-    new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}", "", "",  () => {return BigNumber.from(1e10)}),
-    new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}", "", "",  () => {return BigNumber.from(1e10)}),
-    new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}", "", "",  () => {return BigNumber.from(1e10)}),
+    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = 1", "", () => {return BigNumber.from(1e10)},
+    // Challenge 1 Tick Function
+    "(function (elapsedTime, multiplier) { \n \
+        this.challengeCurrency += 1; \n \
+    })"),
+    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
+    // Challenge 2 Tick Function
+    "(function (elapsedTime, multiplier) { \n \
+        this.challengeCurrency += 2; \n \
+    })"), 
+    new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}", "\\dot{\\rho} = 3", "",  () => {return BigNumber.from(1e10)},
+    // Challenge 3 Tick Function
+    "(function (elapsedTime, multiplier) { \n \
+        this.challengeCurrency += 3; \n \
+    })"),    
+    new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}", "\\dot{\\rho} = 4", "",  () => {return BigNumber.from(1e10)},
+    // Challenge 4 Tick Function 
+    "(function (elapsedTime, multiplier) { \n \
+        this.challengeCurrency += 4; \n \
+    })"),
+    new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}", "\\dot{\\rho} = 5", "",  () => {return BigNumber.from(1e10)},
+    // Challenge 5 Tick Function
+    "(function (elapsedTime, multiplier) { \n \
+        this.challengeCurrency += 5; \n \
+    })"),
 ];
 
 var init = () => {
@@ -105,9 +134,16 @@ var tick = (elapsedTime, multiplier) => {
     for (let challenge of challengeList) {
         totalScore *= challenge.getScore();
     }
+    if (activeChallenge == 0) {
+        q += totalScore * dt;
+        currency.value += bonus * vq1 * vq2 * q * dt;    
+        rho = currency.value;
+    }
+    else {
+        challengeList[activeChallenge - 1].tick(elapsedTime, multiplier);
+        currency.value = challengeList[activeChallenge - 1].getCurrency();
+    }
 
-    q += totalScore * dt;
-    currency.value += bonus * vq1 * vq2 * q * dt;
     challengeBarTau.text = Utils.getMath(theory.tau + theory.latexSymbol);
     challengeBarCurrency.text = Utils.getMath(currency.value.toString() + "\\rho");
     challengeCompletionButton.isVisible = (activeChallenge > 0 && challengeList[activeChallenge - 1].getCurrency() >= (challengeList[activeChallenge - 1].getCompletionRequirement()));
@@ -116,7 +152,9 @@ var tick = (elapsedTime, multiplier) => {
 
 var startChallenge = (id) => {
     activeChallenge = id;
+    currency.value = challengeList[id - 1].getCurrency();
     theory.invalidatePrimaryEquation();
+    theory.invalidateSecondaryEquation();
 }
 
 // UI
@@ -161,7 +199,7 @@ var  getCurrencyBarDelegate = () => {
         columnDefinitions: ["20*", "30*", "auto"],
         children: [
             challengeBarTau = ui.createLatexLabel({
-                text: Utils.getMath(getTau() + theory.latexSymbol),
+                text: Utils.getMath(theory.tau + theory.latexSymbol),
                 row: 0,
                 column: 0,
                 horizontalOptions: LayoutOptions.CENTER,
@@ -217,11 +255,18 @@ var getPrimaryEquation = () => {
 
     return result;
 }
-var getSecondaryEquation = () => theory.latexSymbol + "=\\max\\rho";
+var getSecondaryEquation = () => {
+    if (activeChallenge == 0) {
+        return theory.latexSymbol + "=\\max\\rho";
+    }
+    else{
+        return challengeList[activeChallenge - 1].getSecondaryEquation();
+    }
+}
 var getTertiaryEquation = () => "q=" + q.toString();
 var getPublicationMultiplier = (tau) => tau.pow(0.159);
 var getPublicationMultiplierFormula = (symbol) => "{" + symbol + "}^{0.159}";
-var getTau = () => currency.value;
+var getTau = () => rho;
 var get2DGraphValue = () => currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
 var getQ1 = (level) => Utils.getStepwisePowerSum(level, 2, 10, 0);
 var getQ2 = (level) => BigNumber.TWO.pow(level);
