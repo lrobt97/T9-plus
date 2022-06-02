@@ -5,7 +5,7 @@ import { theory } from "../api/Theory";
 import { Utils } from "../api/Utils";
 
 var id = "t9++"
-var name = "T9++";
+var name = "Theory Dilemmas";
 var description = "An expansion to the 'Convergence Test' theory which contains lemmas that contribute a small amount to tau.";
 var authors = "Gaunter#7599 - Framework design";
 var version = "1.0";
