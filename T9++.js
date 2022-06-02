@@ -11,8 +11,7 @@ var authors = "Gaunter#7599 - Framework design";
 var version = "1.0";
 
 var q = BigNumber.ONE;
-var q1, q2, c1, c2, c3;
-var q1Exp, c3Term, c3Exp;
+var q1, q2;
 
 class Challenge {
     constructor(id, score, isUnlocked, isActive, isCompleted) {
