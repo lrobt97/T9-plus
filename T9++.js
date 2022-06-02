@@ -10,16 +10,18 @@ var description = "An expansion to the 'Convergence Test' theory which contains 
 var authors = "Gaunter#7599 - Framework design";
 var version = "1.0";
 
+currency = theory.createCurrency();
+
 // Decouples main theory currency from tau gain
 var rho = BigNumber.ONE;
-
 var q = BigNumber.ONE;
 var q1, q2;
 var activeChallenge = 0;
 var challengeCompletionUpgrade;
-var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton;
+var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton, exitChallengeButton;
+
 class Challenge {
-    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore, tickFunction) {
+    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore, tickFunction, upgrades) {
         this.id = id;
         this.score = score;
         this.isUnlocked = isUnlocked;
@@ -31,6 +33,14 @@ class Challenge {
         this.tertiaryEquation = tertiaryEquation;
         this.calculateScore = calculateScore;
         this.tick = eval(tickFunction);
+        this.getUpgradeValue = [];
+        this.upgrades = [];
+        if(upgrades){
+            for (const upgrade of upgrades) {
+                this.getUpgradeValue[upgrade.internalId] = upgrade.getValue;
+                this.upgrades[upgrade.internalId] = upgradeFactory(this.id, upgrade);
+            }
+    }
     }
 
     getScore() {
@@ -55,20 +65,64 @@ class Challenge {
 
     completeChallenge(){
         this.score = this.calculateScore();
+        this.resetUpgrades();
+    }
+
+    exitChallenge(){
+        this.score = this.calculateScore();
+        this.resetUpgrades();
+    }
+
+    resetUpgrades(){
         this.challengeCurrency = BigNumber.ONE;
+        for (const upgrade of this.upgrades) {
+            upgrade.isAvailable = false;
+            upgrade.level = 0;
+        }
         activeChallenge = 0;
         theory.invalidatePrimaryEquation();
         theory.invalidateSecondaryEquation();
     }
+
+    updateAvailability() {
+        for (const upgrade of this.upgrades) {
+            if(activeChallenge == this.id){
+                upgrade.isAvailable = true;
+            }
+            else{
+                upgrade.isAvailable = false;
+            }
+        }
+    }
+}
+
+// Takes an upgrade within a challenge object and converts it into a purchasable theory upgrade
+var upgradeFactory = (challengeId, upgrade) => {
+    let temp = theory.createUpgrade(100*challengeId + upgrade.internalId, currency, upgrade.costModel);
+    temp.getDescription = upgrade.description;
+    temp.getInfo = upgrade.info;
+    // Any new upgrades defined this way will be set to false by default and will be available only when the challenge is active
+    temp.isAvailable = false;
+    if (upgrade.maxLevel) temp.maxLevel = upgrade.maxLevel;
+    return temp;
 }
 
 var challengeList = [
     new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = 1", "", () => {return BigNumber.from(1e10)},
     // Challenge 1 Tick Function
     "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 1; \n \
-    })"),
-    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
+        this.challengeCurrency += this.getUpgradeValue[0](this.upgrades[0].level); \n \
+    })", [{
+        // Internal id can be any number between 0 and 99 inclusive
+        internalId: 0,
+        costModel: new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))),
+        getValue: (level) => {
+            return ( level>0 )* BigNumber.from(1e10);
+        },
+        description: (level) => Utils.getMath(challengeList[0].getUpgradeValue[0](level)),
+        info: (level) => Utils.getMath(challengeList[0].getUpgradeValue[0](level)),
+    }]),
+    new Challenge(2, BigNumber.ONE, true, BigNumber.from(1e20), "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
     // Challenge 2 Tick Function
     "(function (elapsedTime, multiplier) { \n \
         this.challengeCurrency += 2; \n \
@@ -91,8 +145,6 @@ var challengeList = [
 ];
 
 var init = () => {
-    currency = theory.createCurrency();
-
     ///////////////////
     // Main Equation Upgrades
 
@@ -131,6 +183,7 @@ var tick = (elapsedTime, multiplier) => {
     let totalScore = BigNumber.ONE
     let vq1 = getQ1(q1.level);
     let vq2 = getQ2(q2.level);
+    updateAvailability();
     for (let challenge of challengeList) {
         totalScore *= challenge.getScore();
     }
@@ -146,6 +199,7 @@ var tick = (elapsedTime, multiplier) => {
 
     challengeBarTau.text = Utils.getMath(theory.tau + theory.latexSymbol);
     challengeBarCurrency.text = Utils.getMath(currency.value.toString() + "\\rho");
+    exitChallengeButton.isVisible = (activeChallenge != 0);
     challengeCompletionButton.isVisible = (activeChallenge > 0 && challengeList[activeChallenge - 1].getCurrency() >= (challengeList[activeChallenge - 1].getCompletionRequirement()));
     theory.invalidateTertiaryEquation();
 }
@@ -153,6 +207,7 @@ var tick = (elapsedTime, multiplier) => {
 var startChallenge = (id) => {
     activeChallenge = id;
     currency.value = challengeList[id - 1].getCurrency();
+    challengeList[id - 1].updateAvailability();
     theory.invalidatePrimaryEquation();
     theory.invalidateSecondaryEquation();
 }
@@ -194,6 +249,16 @@ var createChallengeMenu = () => {
     return menu;
 }
 
+var updateAvailability = () => {
+    q1.isAvailable = (activeChallenge == 0);
+    q2.isAvailable = (activeChallenge == 0);
+    for (let challenge of challengeList) {
+        if(challenge.upgrades.length > 0) {
+            challenge.updateAvailability()
+        };
+    }
+}
+
 var  getCurrencyBarDelegate = () => {
     challengeBar = ui.createGrid({
         columnDefinitions: ["20*", "30*", "auto"],
@@ -209,6 +274,14 @@ var  getCurrencyBarDelegate = () => {
                 text: Utils.getMath(currency.value.toString() + "\\rho"),
                 row: 0,
                 column: 1,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            }),
+            exitChallengeButton = ui.createButton({
+                text: "Exit Challenge",
+                onClicked: () => {challengeList[activeChallenge - 1].exitChallenge();},
+                row: 1,
+                column: 0,
                 horizontalOptions: LayoutOptions.CENTER,
                 verticalOptions: LayoutOptions.CENTER,
             }),
@@ -230,7 +303,7 @@ var goToNextStage = () => {
     challengeMenu.show();
 };
 
-var canGoToNextStage = () => true;
+var canGoToNextStage = () => activeChallenge == 0;
 
 var getInternalState = () => `${q}`
 
