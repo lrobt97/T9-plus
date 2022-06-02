@@ -14,12 +14,10 @@ var q = BigNumber.ONE;
 var q1, q2;
 var activeChallenge = 0;
 class Challenge {
-    constructor(id, score, isUnlocked, isActive, isCompleted, completionRequirement, equation) {
+    constructor(id, score, isUnlocked, completionRequirement, equation) {
         this.id = id;
         this.score = score;
         this.isUnlocked = isUnlocked;
-        this.isActive = isActive;
-        this.isCompleted = isCompleted;
         this.completionRequirement = completionRequirement;
         this.challengeCurrency = BigNumber.ONE;
         this.equation = equation;
@@ -35,11 +33,11 @@ class Challenge {
 }
 
 var challengeList = [
-    new Challenge(1, BigNumber.ONE, true, false, false, BigNumber.ONE, "\\text{Challenge One}"),
-    new Challenge(2, BigNumber.ONE, true, false, false, BigNumber.ONE, "\\text{Challenge Two}"),
-    new Challenge(3, BigNumber.ONE, true, false, false, BigNumber.ONE, "\\text{Challenge Three}"),
-    new Challenge(4, BigNumber.ONE, true, false, false, BigNumber.ONE, "\\text{Challenge Four}"),
-    new Challenge(5, BigNumber.ONE, true, false, false, BigNumber.ONE, "\\text{Challenge Five}"),
+    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}"),
+    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}"),
+    new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}"),
+    new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}"),
+    new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}"),
 ];
 
 var init = () => {
@@ -94,7 +92,6 @@ var tick = (elapsedTime, multiplier) => {
 
 var startChallenge = (id) => {
     activeChallenge = id;
-    challengeList[id - 1].isActive = true;
     theory.invalidatePrimaryEquation();
 }
 
