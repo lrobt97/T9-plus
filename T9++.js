@@ -13,31 +13,52 @@ var version = "1.0";
 var q = BigNumber.ONE;
 var q1, q2;
 var activeChallenge = 0;
+var challengeCompletionUpgrade;
+var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton;
 class Challenge {
-    constructor(id, score, isUnlocked, completionRequirement, equation) {
+    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore) {
         this.id = id;
         this.score = score;
         this.isUnlocked = isUnlocked;
         this.completionRequirement = completionRequirement;
         this.challengeCurrency = BigNumber.ONE;
-        this.equation = equation;
+        this.q = BigNumber.ONE;
+        this.primaryEquation = primaryEquation;
+        this.secondaryEquation = secondaryEquation;
+        this.tertiaryEquation = tertiaryEquation;
+        this.calculateScore = calculateScore;
+    }
+
+    getScore() {
+        return this.score;
     }
 
     getCurrency() {
         return this.challengeCurrency;
     }
 
-    getEquation() {
-        return this.equation;
+    getPrimaryEquation() {
+        return this.primaryEquation;
+    }
+
+    getCompletionRequirement() {
+        return this.completionRequirement;
+    }
+
+    completeChallenge(){
+        this.score = this.calculateScore();
+        this.challengeCurrency = BigNumber.ONE;
+        activeChallenge = 0;
+        theory.invalidatePrimaryEquation();
     }
 }
 
 var challengeList = [
-    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}"),
-    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}"),
-    new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}"),
-    new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}"),
-    new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}"),
+    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "", "", () => {return BigNumber.from(1e10)}),
+    new Challenge(2, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Two}", "", "", () => {return BigNumber.from(1e10)}),
+    new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}", "", "",  () => {return BigNumber.from(1e10)}),
+    new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}", "", "",  () => {return BigNumber.from(1e10)}),
+    new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}", "", "",  () => {return BigNumber.from(1e10)}),
 ];
 
 var init = () => {
@@ -50,7 +71,7 @@ var init = () => {
     {
         let getDesc = (level) => "q_1=" + getQ1(level).toString(0);
         let getInfo = (level) => "q_1=" + getQ1(level).toString(0);
-        q1 = theory.createUpgrade(0, currency, new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))));
+        q1 = theory.createUpgrade(1, currency, new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))));
         q1.getDescription = (amount) => Utils.getMath(getDesc(q1.level));
         q1.getInfo = (amount) => Utils.getMathTo(getInfo(q1.level), getInfo(q1.level + amount));
     }
@@ -59,7 +80,7 @@ var init = () => {
     {
         let getDesc = (level) => "q_2=2^{" + level + "}";
         let getInfo = (level) => "q_2=" + getQ2(level).toString(0);
-        q2 = theory.createUpgrade(1, currency, new ExponentialCost(15, Math.log2(8)));
+        q2 = theory.createUpgrade(2, currency, new ExponentialCost(15, Math.log2(8)));
         q2.getDescription = (amount) => Utils.getMath(getDesc(q2.level));
         q2.getInfo = (amount) => Utils.getMathTo(getInfo(q2.level), getInfo(q2.level + amount));
     }
@@ -81,12 +102,15 @@ var tick = (elapsedTime, multiplier) => {
     let totalScore = BigNumber.ONE
     let vq1 = getQ1(q1.level);
     let vq2 = getQ2(q2.level);
-    for (const challenge of challengeList) {
-        totalScore *= challenge.score;
+    for (let challenge of challengeList) {
+        totalScore *= challenge.getScore();
     }
 
     q += totalScore * dt;
     currency.value += bonus * vq1 * vq2 * q * dt;
+    challengeBarTau.text = Utils.getMath(theory.tau + theory.latexSymbol);
+    challengeBarCurrency.text = Utils.getMath(currency.value.toString() + "\\rho");
+    challengeCompletionButton.isVisible = (activeChallenge > 0 && challengeList[activeChallenge - 1].getCurrency() >= (challengeList[activeChallenge - 1].getCompletionRequirement()));
     theory.invalidateTertiaryEquation();
 }
 
@@ -102,8 +126,6 @@ var startChallenge = (id) => {
 //   id: int,
 //   score: float, 
 //   isUnlocked: bool,
-//   isActive: bool,
-//   isCompleted: bool,
 //}
 populateChallengeMenu = (challenges) => {
     let menuItems = [];
@@ -133,6 +155,38 @@ var createChallengeMenu = () => {
 
     return menu;
 }
+
+var  getCurrencyBarDelegate = () => {
+    challengeBar = ui.createGrid({
+        columnDefinitions: ["20*", "30*", "auto"],
+        children: [
+            challengeBarTau = ui.createLatexLabel({
+                text: Utils.getMath(getTau() + theory.latexSymbol),
+                row: 0,
+                column: 0,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            }),
+            challengeBarCurrency = ui.createLatexLabel({
+                text: Utils.getMath(currency.value.toString() + "\\rho"),
+                row: 0,
+                column: 1,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            }),
+            challengeCompletionButton = ui.createButton({
+                text: "Complete Challenge",
+                onClicked: () => {challengeList[activeChallenge - 1].completeChallenge();},
+                row: 1,
+                column: 1,
+                horizontalOptions: LayoutOptions.CENTER,
+                verticalOptions: LayoutOptions.CENTER,
+            })
+        ],
+    });
+    return challengeBar;
+}
+
 var goToNextStage = () => {
     var challengeMenu = createChallengeMenu();
     challengeMenu.show();
@@ -152,16 +206,13 @@ var postPublish = () => {
 }
 
 var getPrimaryEquation = () => {
-    let result = "";
-
+    theory.primaryEquationHeight = 55;
     if (activeChallenge == 0) {
     result = "\\begin{matrix}\\dot{\\rho}=q_1";
     result += "q_2q\\\\\\dot{q}= \\prod \\lambda _i\\end{matrix}";
-    theory.primaryEquationHeight = 55;
     }
     else{
-       log(activeChallenge + " "+ challengeList[activeChallenge - 1].equation);
-        result = challengeList[activeChallenge - 1].getEquation();
+        result = challengeList[activeChallenge - 1].getPrimaryEquation();
     }
 
     return result;
