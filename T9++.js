@@ -14,6 +14,24 @@ var q = BigNumber.ONE;
 var q1, q2, c1, c2, c3;
 var q1Exp, c3Term, c3Exp;
 
+class Challenge {
+    constructor(id, score, isUnlocked, isActive, isCompleted) {
+        this.id = id;
+        this.score = score;
+        this.isUnlocked = isUnlocked;
+        this.isActive = isActive;
+        this.isCompleted = isCompleted;
+    }
+}
+
+var challengeList = [
+    new Challenge(1, BigNumber.ONE, true, false, false),
+    new Challenge(2, BigNumber.ONE, true, false, false),
+    new Challenge(3, BigNumber.ONE, false, false, false),
+    new Challenge(4, BigNumber.ONE, true, false, false),
+    new Challenge(5, BigNumber.ONE, true, false, false),
+];
+
 var init = () => {
     currency = theory.createCurrency();
 
@@ -52,11 +70,61 @@ var updateAvailability = () => {
 var tick = (elapsedTime, multiplier) => {
     let dt = BigNumber.from(elapsedTime * multiplier);
     let bonus = theory.publicationMultiplier;
+    let totalScore = BigNumber.ONE
     let vq1 = getQ1(q1.level);
     let vq2 = getQ2(q2.level);
+    for (const challenge of challengeList) {
+        totalScore *= challenge.score;
+    }
+
+    q += totalScore * dt;
     currency.value += bonus * vq1 * vq2 * q * dt;
     theory.invalidateTertiaryEquation();
 }
+// UI
+
+// challenge object JSON format:
+// challenge = {
+//   id: int,
+//   score: float, 
+//   isUnlocked: bool,
+//   isActive: bool,
+//   isCompleted: bool,
+//}
+populateChallengeMenu = (challenges) => {
+    let menuItems = [];
+    for (const challenge of challenges) {
+        if(challenge.isUnlocked) {
+            menuItems.push(
+            ui.createGrid({
+               columnDefinitions: ["20*", "30*", "auto"],
+                  children: [
+                     ui.createLatexLabel({text: Utils.getMath("\\lambda_"+ challenge.id + "= " + challenge.score.toString()), horizontalOptions: LayoutOptions.CENTER, verticalOptions: LayoutOptions.CENTER}),
+                     ui.createButton({text: "Start Challenge", onClicked: () => { startChallenge(challenge.id)}, row: 0, column: 1 }), 
+                  ]
+            }));
+        }
+    }
+
+    return menuItems;
+}
+var createChallengeMenu = () => {
+    let menu = ui.createPopup({
+        title: "Dilemmas",
+        content: ui.createStackLayout({
+            children: populateChallengeMenu(challengeList),
+        })
+    }
+    )
+
+    return menu;
+}
+var goToNextStage = () => {
+    var challengeMenu = createChallengeMenu();
+    challengeMenu.show();
+};
+
+var canGoToNextStage = () => true;
 
 var getInternalState = () => `${q}`
 
@@ -77,7 +145,6 @@ var getPrimaryEquation = () => {
 
     return result;
 }
-
 var getSecondaryEquation = () => theory.latexSymbol + "=\\max\\rho";
 var getTertiaryEquation = () => "q=" + q.toString();
 var getPublicationMultiplier = (tau) => tau.pow(0.159);
