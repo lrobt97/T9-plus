@@ -95,9 +95,11 @@ class Challenge {
             upgrade.isAvailable = false;
             upgrade.level = 0;
         }
+        if(this.internalVars){
         for(const internalVar of this.internalVars){
             internalVar.value = internalVar.initialValue;
         }
+    }
         activeChallenge = 0;
         theory.invalidatePrimaryEquation();
         theory.invalidateSecondaryEquation();
