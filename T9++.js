@@ -111,16 +111,16 @@ var challengeList = [
     new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = 1", "", () => {return BigNumber.from(1e10)},
     // Challenge 1 Tick Function
     "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += this.getUpgradeValue[0](this.upgrades[0].level); \n \
+        this.challengeCurrency = this.getUpgradeValue[0](this.upgrades[0].level); \n \
     })", [{
         // Internal id can be any number between 0 and 99 inclusive
         internalId: 0,
-        costModel: new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))),
+        costModel: new FirstFreeCost(new ExponentialCost(1, Math.log2(1))),
         getValue: (level) => {
-            return ( level>0 )* BigNumber.from(1e10);
+            return ( level );
         },
-        description: (level) => Utils.getMath(challengeList[0].getUpgradeValue[0](level)),
-        info: (level) => Utils.getMath(challengeList[0].getUpgradeValue[0](level)),
+        description: (amount) => Utils.getMath(challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level)),
+        info: (amount) => Utils.getMathTo(challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level), challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level + amount)),
     }]),
     new Challenge(2, BigNumber.ONE, true, BigNumber.from(1e20), "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
     // Challenge 2 Tick Function
