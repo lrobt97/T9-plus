@@ -117,7 +117,7 @@ var tick = (elapsedTime, multiplier) => {
     vq2 = getQ2(q2.level);
   
     dotrho = vq1 * vq2 * q;
-    currnecy.value += dotrho * dt * bonus;
+    currency.value += dotrho * dt * bonus;
     
     theory.invalidateTertiaryEquation();
 }
