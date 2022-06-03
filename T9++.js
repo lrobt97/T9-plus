@@ -20,14 +20,20 @@ var activeChallenge = 0;
 var challengeCompletionUpgrade;
 var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton, exitChallengeButton;
 
+class Variable{
+    constructor(latexSymbol, initialValue){
+        this.latexSymbol = latexSymbol;
+        this.initialValue = initialValue;
+        this.value = initialValue;
+    }
+}
 class Challenge {
-    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore, tickFunction, upgrades) {
+    constructor(id, score, isUnlocked, completionRequirement, primaryEquation, secondaryEquation, tertiaryEquation, calculateScore, tickFunction, upgrades, internalVars) {
         this.id = id;
         this.score = score;
         this.isUnlocked = isUnlocked;
         this.completionRequirement = completionRequirement;
         this.challengeCurrency = BigNumber.ONE;
-        this.q = BigNumber.ONE;
         this.primaryEquation = primaryEquation;
         this.secondaryEquation = secondaryEquation;
         this.tertiaryEquation = tertiaryEquation;
@@ -40,7 +46,8 @@ class Challenge {
                 this.getUpgradeValue[upgrade.internalId] = upgrade.getValue;
                 this.upgrades[upgrade.internalId] = upgradeFactory(this.id, upgrade);
             }
-    }
+        }
+        this.internalVars = internalVars;
     }
 
     getScore() {
@@ -59,6 +66,15 @@ class Challenge {
         return this.secondaryEquation;
     }
 
+    getTertiaryEquation() {
+        let tertiaryEquation = "";
+        if(this.internalVars){
+        for (const internalVar of this.internalVars) {
+            tertiaryEquation += internalVar.latexSymbol + " = " + internalVar.value + "\\ ";
+        }
+    }
+        return tertiaryEquation;
+    }
     getCompletionRequirement() {
         return this.completionRequirement;
     }
@@ -78,6 +94,9 @@ class Challenge {
         for (const upgrade of this.upgrades) {
             upgrade.isAvailable = false;
             upgrade.level = 0;
+        }
+        for(const internalVar of this.internalVars){
+            internalVar.value = internalVar.initialValue;
         }
         activeChallenge = 0;
         theory.invalidatePrimaryEquation();
@@ -108,10 +127,12 @@ var upgradeFactory = (challengeId, upgrade) => {
 }
 
 var challengeList = [
-    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = 1", "", () => {return BigNumber.from(1e10)},
+    new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = qr, \\dot{q} = 1, \\dot{r} = 2", "", () => {return BigNumber.from(1e10)},
     // Challenge 1 Tick Function
     "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 1; \n \
+        this.internalVars[0].value += 1; \n \
+        this.internalVars[1].value += 2; \n \
+        this.challengeCurrency += this.internalVars[0].value * this.internalVars[1].value; \n \
     })", [{
         // Internal id can be any number between 0 and 99 inclusive
         internalId: 0,
@@ -121,7 +142,10 @@ var challengeList = [
         },
         description: (amount) => Utils.getMath(challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level)),
         info: (amount) => Utils.getMathTo(challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level), challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level + amount)),
-    }]),
+    }], 
+    // new Variable(latexSymbol, initialValue)
+    [new Variable("q", BigNumber.ONE), new Variable("r", BigNumber.ONE)]
+    ),
     new Challenge(2, BigNumber.ONE, true, BigNumber.from(1e20), "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
     // Challenge 2 Tick Function
     "(function (elapsedTime, multiplier) { \n \
@@ -338,7 +362,14 @@ var getSecondaryEquation = () => {
         return challengeList[activeChallenge - 1].getSecondaryEquation();
     }
 }
-var getTertiaryEquation = () => "q=" + q.toString();
+var getTertiaryEquation = () => {
+    if (activeChallenge == 0) {
+        return "q=" + q.toString();
+    }
+    else{
+        return challengeList[activeChallenge - 1].getTertiaryEquation();
+    }
+}
 var getPublicationMultiplier = (tau) => tau.pow(0.159);
 var getPublicationMultiplierFormula = (symbol) => "{" + symbol + "}^{0.159}";
 var getTau = () => rho;
