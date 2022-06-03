@@ -111,11 +111,11 @@ var challengeList = [
     new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = 1", "", () => {return BigNumber.from(1e10)},
     // Challenge 1 Tick Function
     "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency = this.getUpgradeValue[0](this.upgrades[0].level); \n \
+        this.challengeCurrency += 1; \n \
     })", [{
         // Internal id can be any number between 0 and 99 inclusive
         internalId: 0,
-        costModel: new FirstFreeCost(new ExponentialCost(1, Math.log2(1))),
+        costModel: new FirstFreeCost(new ExponentialCost(10, Math.log2(1))),
         getValue: (level) => {
             return ( level );
         },
@@ -189,10 +189,12 @@ var tick = (elapsedTime, multiplier) => {
     }
     if (activeChallenge == 0) {
         q += totalScore * dt;
-        currency.value += bonus * vq1 * vq2 * q * dt;    
         rho = currency.value;
+        rho += bonus * vq1 * vq2 * q * dt;    
+        currency.value = rho;
     }
     else {
+        challengeList[activeChallenge - 1].challengeCurrency = currency.value;
         challengeList[activeChallenge - 1].tick(elapsedTime, multiplier);
         currency.value = challengeList[activeChallenge - 1].getCurrency();
     }
