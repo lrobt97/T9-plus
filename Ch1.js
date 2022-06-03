@@ -8,10 +8,10 @@ var id = "challenge_1"
 var name = "Challenge 1";
 var description = "Testing challenge1";
 var authors = "Solarion#4131";
-var version = 1;
+var version = 1.1;
 
 var q = BigNumber.ONE;
-
+var dotrho;
 var q1, q2, c1, c2, x1, y1, x2, y2, x, y;
 var q1Exp;
 
@@ -116,7 +116,8 @@ var tick = (elapsedTime, multiplier) => {
     vq1 = getQ1(q1.level);
     vq2 = getQ2(q2.level);
   
-    currency.value += vq1 * vq2 * bonus * q * dt;
+    dotrho = vq1 * vq2 * q;
+    currnecy.value += dotrho * dt * bonus;
     
     theory.invalidateTertiaryEquation();
 }
@@ -165,6 +166,8 @@ var getTertiaryEquation = () => {
     let bigy = BigNumber.from(y);
     var xyval = bigx.pow(2) - getD(D.level) * bigy.pow(2);
     result += (xyval).abs();
+    result += ",\\;\\dot{\\rho}=";
+    result += dotrho.toString(0);
     theory.tertiaryEquationHeight = 40;
     return result;
 }
