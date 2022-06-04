@@ -14,11 +14,13 @@ currency = theory.createCurrency();
 
 // Decouples main theory currency from tau gain
 var rho = BigNumber.ONE;
-var q = BigNumber.ONE;
-var q1, q2;
+var c1, c2;
+var scoreExponent;
+var scoreExponentScale = 0.15;
 var activeChallenge = 0;
-var challengeCompletionUpgrade;
+var unlockNextChallenge;
 var challengeBar, challengeBarTau, challengeBarCurrency, challengeCompletionButton, exitChallengeButton;
+var tauExponent = 0.5;
 
 class Variable{
     constructor(latexSymbol, initialValue){
@@ -183,24 +185,36 @@ var challengeList = [
 
 var init = () => {
     ///////////////////
+    // Milestones
+
+    theory.setMilestoneCost(new CustomCost((total) => BigNumber.from(getMileStoneRoute(total))));
+    // Score multiplier exponent
+    {
+        scoreExponent = theory.createMilestoneUpgrade(0, 2);
+        scoreExponent.getDescription = (_) => Localization.getUpgradeIncCustomExpDesc("\\prod \\lambda_i", scoreExponentScale);  
+        scoreExponent.getInfo = (_) => Localization.getUpgradeIncCustomExpInfo("\\prod \\lambda_i", scoreExponentScale);
+        scoreExponent.boughtOrRefunded = (_) =>  updateAvailability(); theory.invalidatePrimaryEquation(); 
+    }
+
+    ///////////////////
     // Main Equation Upgrades
 
     // q1
     {
-        let getDesc = (level) => "q_1=" + getQ1(level).toString(0);
-        let getInfo = (level) => "q_1=" + getQ1(level).toString(0);
-        q1 = theory.createUpgrade(1, currency, new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))));
-        q1.getDescription = (amount) => Utils.getMath(getDesc(q1.level));
-        q1.getInfo = (amount) => Utils.getMathTo(getInfo(q1.level), getInfo(q1.level + amount));
+        let getDesc = (level) => "c_1=" + getC1(level).toString(0);
+        let getInfo = (level) => "c_1=" + getC1(level).toString(0);
+        c1 = theory.createUpgrade(1, currency, new FirstFreeCost(new ExponentialCost(10, Math.log2(1.61328))));
+        c1.getDescription = (amount) => Utils.getMath(getDesc(c1.level));
+        c1.getInfo = (amount) => Utils.getMathTo(getInfo(c1.level), getInfo(c1.level + amount));
     }
 
     // q2
     {
-        let getDesc = (level) => "q_2=2^{" + level + "}";
-        let getInfo = (level) => "q_2=" + getQ2(level).toString(0);
-        q2 = theory.createUpgrade(2, currency, new ExponentialCost(15, Math.log2(8)));
-        q2.getDescription = (amount) => Utils.getMath(getDesc(q2.level));
-        q2.getInfo = (amount) => Utils.getMathTo(getInfo(q2.level), getInfo(q2.level + amount));
+        let getDesc = (level) => "c_2=2^{" + level + "}";
+        let getInfo = (level) => "c_2=" + getC2(level).toString(0);
+        c2 = theory.createUpgrade(2, currency, new ExponentialCost(15, Math.log2(8)));
+        c2.getDescription = (amount) => Utils.getMath(getDesc(c2.level));
+        c2.getInfo = (amount) => Utils.getMathTo(getInfo(c2.level), getInfo(c2.level + amount));
     }
 
     /////////////////////
@@ -209,7 +223,7 @@ var init = () => {
     theory.createBuyAllUpgrade(1, currency, 1e10);
     theory.createAutoBuyerUpgrade(2, currency, 1e30);
 
-    var unlockNextChallenge = theory.createPermanentUpgrade(3, currency, new CustomCost((level) => {BigNumber.TEN.pow(30)}));
+    unlockNextChallenge = theory.createPermanentUpgrade(3, currency, new CustomCost((level) => BigNumber.TEN.pow(level*20)));
     unlockNextChallenge.getDescription = (_) => "Unlock Next Challenge";
     unlockNextChallenge.getInfo = (_) => "Unlock Next Challenge";
     unlockNextChallenge.maxLevel = 5;
@@ -220,20 +234,28 @@ var init = () => {
 var updateAvailability = () => {
 }
 
+var calculateScoreMultiplier = () => {
+    let totalScore = BigNumber.ZERO;
+    // While in development, we will mock the score
+    if (false){
+        for (let challenge of challengeList) {
+            totalScore *= challenge.getScore();
+        }    
+    }
+    else{
+        totalScore = BigNumber.TEN.pow(30) // BigNumber.TEN.pow(unlockNextChallenge.level * 5);
+    }
+    return totalScore;
+}
 var tick = (elapsedTime, multiplier) => {
     let dt = BigNumber.from(elapsedTime * multiplier);
-    let bonus = theory.publicationMultiplier;
-    let totalScore = BigNumber.ONE
-    let vq1 = getQ1(q1.level);
-    let vq2 = getQ2(q2.level);
+    let bonus = theory.publicationMultiplier * calculateScoreMultiplier().pow(1 + scoreExponent.level*scoreExponentScale);
+    let vc1 = getC1(c1.level);
+    let vc2 = getC2(c2.level);
     updateAvailability();
-    for (let challenge of challengeList) {
-        totalScore *= challenge.getScore();
-    }
     if (activeChallenge == 0) {
-        q += totalScore * dt;
         rho = currency.value;
-        rho += bonus * vq1 * vq2 * q * dt;    
+        rho += bonus * vc1 * vc2 * dt;    
         currency.value = rho;
     }
     else {
@@ -246,6 +268,7 @@ var tick = (elapsedTime, multiplier) => {
     challengeBarCurrency.text = Utils.getMath(currency.value.toString() + "\\rho");
     exitChallengeButton.isVisible = (activeChallenge != 0);
     challengeCompletionButton.isVisible = (activeChallenge > 0 && challengeList[activeChallenge - 1].getCurrency() >= (challengeList[activeChallenge - 1].getCompletionRequirement()));
+    theory.invalidatePrimaryEquation();
     theory.invalidateTertiaryEquation();
 }
 
@@ -295,8 +318,8 @@ var createChallengeMenu = () => {
 }
 
 var updateAvailability = () => {
-    q1.isAvailable = (activeChallenge == 0);
-    q2.isAvailable = (activeChallenge == 0);
+    c1.isAvailable = (activeChallenge == 0);
+    c2.isAvailable = (activeChallenge == 0);
     for (let challenge of challengeList) {
         if(challenge.upgrades.length > 0) {
             challenge.updateAvailability()
@@ -369,14 +392,13 @@ var serialiseChallengeData = () => {
     for (let challenge of challengeList) {
         challengeData.push(new ChallengeData(challenge.score, challenge.isUnlocked, challenge.challengeCurrency, challenge.internalVars));
     }
-    log(JSON.stringify(challengeData));
     return JSON.stringify(challengeData);
 }
 
 var deserialiseChallengeData = (data) => {
     let challengeData = JSON.parse(data);
     let index = 0;
-    for (let data of challengeData) {
+    if (challengeData) for (let data of challengeData) {
         challengeList[index].score = parseBigNumber(data.score);
         challengeList[index].isUnlocked = data.isUnlocked == "true";
         challengeList[index].challengeCurrency = parseBigNumber(data.challengeCurrency);
@@ -385,14 +407,13 @@ var deserialiseChallengeData = (data) => {
     }
 }
 
-var getInternalState = () => `${q} ${serialiseChallengeData()} ${rho} ${activeChallenge}`;
+var getInternalState = () => `${serialiseChallengeData()} ${rho} ${activeChallenge}`;
 
 var setInternalState = (state) => {
     let values = state.split(" ");
-    if (values.length > 0) q = parseBigNumber(values[0]);
-    if (values.length > 1) deserialiseChallengeData(values[1]);
-    if (values.length > 2) rho = parseBigNumber(values[2]);
-    if (values.length > 3) activeChallenge = parseInt(values[3]);
+    if (values.length > 0) deserialiseChallengeData(values[0]);
+    if (values.length > 1) rho = parseBigNumber(values[1]);
+    if (values.length > 2) activeChallenge = parseInt(values[2]);
 }
 
 var postPublish = () => {
@@ -401,10 +422,11 @@ var postPublish = () => {
 }
 
 var getPrimaryEquation = () => {
+    let scoreExponentText = scoreExponent.level >= 1 ? "( \\prod \\lambda_i ) ^{"+ (1 + scoreExponent.level*scoreExponentScale).toString() + "}" : "\\prod \\lambda_i";
     theory.primaryEquationHeight = 55;
+
     if (activeChallenge == 0) {
-    result = "\\begin{matrix}\\dot{\\rho}=q_1";
-    result += "q_2q\\\\\\dot{q}= \\prod \\lambda _i\\end{matrix}";
+    result = "\\dot{\\rho}=c_1 c_2 " + scoreExponentText;
     }
     else{
         result = challengeList[activeChallenge - 1].getPrimaryEquation();
@@ -414,7 +436,7 @@ var getPrimaryEquation = () => {
 }
 var getSecondaryEquation = () => {
     if (activeChallenge == 0) {
-        return theory.latexSymbol + "=\\max\\rho";
+        return theory.latexSymbol + "=\\max\\rho^{" + tauExponent +"}";
     }
     else{
         return challengeList[activeChallenge - 1].getSecondaryEquation();
@@ -422,16 +444,25 @@ var getSecondaryEquation = () => {
 }
 var getTertiaryEquation = () => {
     if (activeChallenge == 0) {
-        return "q=" + q.toString();
+        return "\\prod \\lambda_i \\ =" + calculateScoreMultiplier().toString();
     }
     else{
         return challengeList[activeChallenge - 1].getTertiaryEquation();
     }
 }
-var getPublicationMultiplier = (tau) => tau.pow(0.159);
-var getPublicationMultiplierFormula = (symbol) => "{" + symbol + "}^{0.159}";
-var getTau = () => rho;
+var getMileStoneRoute = (level) => {
+    let result = 1
+    switch(level) {
+        case 0: result = tauExponent * 40; break;
+        case 1: result = tauExponent * 110; break;
+    }
+    return result;
+}
+var getPublicationMultiplier = (tau) => tau.pow(0.15/tauExponent);
+var getPublicationMultiplierFormula = (symbol) => "{" + symbol + "}^{"+ 0.15/tauExponent +"}";
+var getTau = () => rho.pow(tauExponent);
 var get2DGraphValue = () => currency.value.sign * (BigNumber.ONE + currency.value.abs()).log10().toNumber();
-var getQ1 = (level) => Utils.getStepwisePowerSum(level, 2, 10, 0);
-var getQ2 = (level) => BigNumber.TWO.pow(level);
+var getCurrencyFromTau = (tau) => [tau.max(BigNumber.ONE).pow(1/tauExponent), currency.symbol];
+var getC1 = (level) => Utils.getStepwisePowerSum(level, 2, 10, 0);
+var getC2 = (level) => BigNumber.TWO.pow(level);
 init();
