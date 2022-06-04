@@ -79,6 +79,17 @@ class Challenge {
         return this.completionRequirement;
     }
 
+    setInternalVar(index, value){
+        this.internalVars[index] = value;
+    }
+
+    setInternalVars(values){
+        let index = 0;
+        for (const value of values) {
+            this.internalVars[index].value = parseBigNumber(value);
+        }
+    }
+
     completeChallenge(){
         this.score = this.calculateScore();
         this.resetUpgrades();
@@ -197,6 +208,12 @@ var init = () => {
     theory.createPublicationUpgrade(0, currency, 1e7);
     theory.createBuyAllUpgrade(1, currency, 1e10);
     theory.createAutoBuyerUpgrade(2, currency, 1e30);
+
+    var unlockNextChallenge = theory.createPermanentUpgrade(3, currency, new CustomCost((level) => {BigNumber.TEN.pow(30)}));
+    unlockNextChallenge.getDescription = (_) => "Unlock Next Challenge";
+    unlockNextChallenge.getInfo = (_) => "Unlock Next Challenge";
+    unlockNextChallenge.maxLevel = 5;
+
     updateAvailability();
 }
 
@@ -333,15 +350,54 @@ var goToNextStage = () => {
 
 var canGoToNextStage = () => activeChallenge == 0;
 
-var getInternalState = () => `${q}`
+class ChallengeData {
+    constructor(score, isUnlocked, challengeCurrency, internalVars) {
+        this.score = score.toString();
+        this.isUnlocked = isUnlocked.toString();
+        this.challengeCurrency = challengeCurrency.toString();
+
+        // Saves the value of each internal variable within each challenge as a string array
+        this.internalVars = [];
+        for (let internalVar in internalVars) {
+            if (internalVar.value) this.internalVars.push(internalVar.value.toString());
+        }
+    }
+}
+
+var serialiseChallengeData = () => {
+    let challengeData = [];
+    for (let challenge of challengeList) {
+        challengeData.push(new ChallengeData(challenge.score, challenge.isUnlocked, challenge.challengeCurrency, challenge.internalVars));
+    }
+    log(JSON.stringify(challengeData));
+    return JSON.stringify(challengeData);
+}
+
+var deserialiseChallengeData = (data) => {
+    let challengeData = JSON.parse(data);
+    let index = 0;
+    for (let data of challengeData) {
+        challengeList[index].score = parseBigNumber(data.score);
+        challengeList[index].isUnlocked = data.isUnlocked == "true";
+        challengeList[index].challengeCurrency = parseBigNumber(data.challengeCurrency);
+        if(data.internalVars) challengeList[index].setInternalVars(data.internalVars);
+        index++;
+    }
+}
+
+var getInternalState = () => `${q} ${serialiseChallengeData()} ${rho} ${activeChallenge}`;
 
 var setInternalState = (state) => {
     let values = state.split(" ");
     if (values.length > 0) q = parseBigNumber(values[0]);
+    if (values.length > 1) deserialiseChallengeData(values[1]);
+    if (values.length > 2) rho = parseBigNumber(values[2]);
+    if (values.length > 3) activeChallenge = parseInt(values[3]);
 }
 
 var postPublish = () => {
     q = BigNumber.ONE;
+    rho = BigNumber.ONE;
 }
 
 var getPrimaryEquation = () => {
