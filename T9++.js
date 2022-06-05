@@ -40,7 +40,6 @@ class Challenge {
         this.secondaryEquation = secondaryEquation;
         this.tertiaryEquation = tertiaryEquation;
         this.calculateScore = calculateScore;
-        this.tick = eval(tickFunction);
         this.getUpgradeValue = [];
         this.upgrades = [];
         if(upgrades){
@@ -50,6 +49,7 @@ class Challenge {
             }
         }
         this.internalVars = internalVars;
+        this.tick = tickFunction.bind(this);
     }
 
     getScore() {
@@ -143,12 +143,13 @@ var upgradeFactory = (challengeId, upgrade) => {
 
 var challengeList = [
     new Challenge(1, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge One}", "\\dot{\\rho} = qr, \\dot{q} = 1, \\dot{r} = 2", "", () => {return BigNumber.from(1e10)},
-    // Challenge 1 Tick Function
-    "(function (elapsedTime, multiplier) { \n \
-        this.internalVars[0].value += 1; \n \
-        this.internalVars[1].value += 2; \n \
-        this.challengeCurrency += this.internalVars[0].value * this.internalVars[1].value; \n \
-    })", [{
+    function challengeOneTick(elapsedTime, multiplier) {
+        log(this.id)
+        this.internalVars[0].value += 1; 
+        this.internalVars[1].value += 2;
+        this.challengeCurrency += this.internalVars[0].value * this.internalVars[1].value;
+    }, [{
+        // Challenge 1 Upgrades
         // Internal id can be any number between 0 and 99 inclusive
         internalId: 0,
         costModel: new FirstFreeCost(new ExponentialCost(10, Math.log2(1))),
@@ -159,31 +160,29 @@ var challengeList = [
         info: (amount) => Utils.getMathTo(challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level), challengeList[0].getUpgradeValue[0](challengeList[0].upgrades[0].level + amount)),
     }], 
     // new Variable(latexSymbol, initialValue)
+    // Challenge 1 Internal Variables
     [new Variable("q", BigNumber.ONE), new Variable("r", BigNumber.ONE)]
     ),
     new Challenge(2, BigNumber.ONE, true, BigNumber.from(1e20), "\\text{Challenge Two}", "\\dot{\\rho} = 2", "", () => {return BigNumber.from(1e10)}, 
-    // Challenge 2 Tick Function
-    "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 2; \n \
-    })"), 
+    function challengeTwoTick(elapsedTime, multiplier) { 
+        this.challengeCurrency += 2; 
+    }), 
     new Challenge(3, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Three}", "\\dot{\\rho} = 3", "",  () => {return BigNumber.from(1e10)},
-    // Challenge 3 Tick Function
-    "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 3; \n \
-    })"),    
+    function challengeThreeTick(elapsedTime, multiplier) {
+        this.challengeCurrency += 3; 
+    }),    
     new Challenge(4, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Four}", "\\dot{\\rho} = 4", "",  () => {return BigNumber.from(1e10)},
     // Challenge 4 Tick Function 
-    "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 4; \n \
-    })"),
+    function challengeFourTick(elapsedTime, multiplier) {
+        this.challengeCurrency += 4;
+    }),
     new Challenge(5, BigNumber.ONE, true, BigNumber.ONE, "\\text{Challenge Five}", "\\dot{\\rho} = 5", "",  () => {return BigNumber.from(1e10)},
-    // Challenge 5 Tick Function
-    "(function (elapsedTime, multiplier) { \n \
-        this.challengeCurrency += 5; \n \
-    })"),
+    function challengeFiveTick (elapsedTime, multiplier) { 
+        this.challengeCurrency += 5;
+    }),
 ];
 
-var init = () => {
+var init = () => {    
     ///////////////////
     // Milestones
 
@@ -260,7 +259,7 @@ var tick = (elapsedTime, multiplier) => {
     }
     else {
         challengeList[activeChallenge - 1].challengeCurrency = currency.value;
-        challengeList[activeChallenge - 1].tick(elapsedTime, multiplier);
+        challengeList[activeChallenge - 1].tick.call(challengeList[activeChallenge - 1], elapsedTime, multiplier);
         currency.value = challengeList[activeChallenge - 1].getCurrency();
     }
 
