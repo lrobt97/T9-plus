@@ -37,7 +37,7 @@ class Challenge {
             for (const upgrade of upgrades) {
                 this.getUpgradeValue[upgrade.internalId] = upgrade.getValue;
                 this.upgrades[upgrade.internalId] = upgradeFactory(this.id, upgrade);
-        }   }   }
+            }   }
 
     getScore() {
         return this.score;
