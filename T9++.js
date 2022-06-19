@@ -28,9 +28,7 @@ class Challenge {
         this.completionRequirement = completionRequirement;
         this.challengeCurrency = BigNumber.ONE;
         this.q = BigNumber.ONE;
-        this.primaryEquation = primaryEquation;
-        this.secondaryEquation = secondaryEquation;
-        this.tertiaryEquation = tertiaryEquation;
+        this.equation = [primaryEquation, secondaryEquation, tertiaryEquation];
         this.calculateScore = calculateScore;
         this.tick = eval(tickFunction);
         this.getUpgradeValue = [];
@@ -39,9 +37,7 @@ class Challenge {
             for (const upgrade of upgrades) {
                 this.getUpgradeValue[upgrade.internalId] = upgrade.getValue;
                 this.upgrades[upgrade.internalId] = upgradeFactory(this.id, upgrade);
-            }
-    }
-    }
+        }   }   }
 
     getScore() {
         return this.score;
@@ -51,23 +47,14 @@ class Challenge {
         return this.challengeCurrency;
     }
 
-    getPrimaryEquation() {
-        return this.primaryEquation;
-    }
-
-    getSecondaryEquation() {
-        return this.secondaryEquation;
+    getEquation(n) {
+        return this.equation[n];
     }
 
     getCompletionRequirement() {
         return this.completionRequirement;
     }
-
-    completeChallenge(){
-        this.score = this.calculateScore();
-        this.resetUpgrades();
-    }
-
+        
     exitChallenge(){
         this.score = this.calculateScore();
         this.resetUpgrades();
@@ -287,7 +274,7 @@ var  getCurrencyBarDelegate = () => {
             }),
             challengeCompletionButton = ui.createButton({
                 text: "Complete Challenge",
-                onClicked: () => {challengeList[activeChallenge - 1].completeChallenge();},
+                onClicked: () => {challengeList[activeChallenge - 1].exitChallenge();},
                 row: 1,
                 column: 1,
                 horizontalOptions: LayoutOptions.CENTER,
@@ -323,7 +310,7 @@ var getPrimaryEquation = () => {
     result += "q_2q\\\\\\dot{q}= \\prod \\lambda _i\\end{matrix}";
     }
     else{
-        result = challengeList[activeChallenge - 1].getPrimaryEquation();
+        result = challengeList[activeChallenge - 1].getEquation(0);
     }
 
     return result;
@@ -333,7 +320,7 @@ var getSecondaryEquation = () => {
         return theory.latexSymbol + "=\\max\\rho";
     }
     else{
-        return challengeList[activeChallenge - 1].getSecondaryEquation();
+        return challengeList[activeChallenge - 1].getEquation(1);
     }
 }
 var getTertiaryEquation = () => "q=" + q.toString();
